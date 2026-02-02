@@ -69,10 +69,10 @@ If setting up multiple Claude instances:
 
 ### In Instance A (e.g., Claude IDE):
 ```
-Post a test message to emergent_main saying "Hello from Claude IDE"
+Post a test message to claude_code_main saying "Hello from Claude IDE"
 ```
 
-### In Instance B (e.g., Emergent):
+### In Instance B (e.g., Claude Code):
 ```
 Check for pending messages
 ```
