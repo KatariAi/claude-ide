@@ -32,6 +32,7 @@
    - `agent_config`
    - `artifacts`
    - `adrs`
+   - `workflow_learnings`
 
 ---
 
