@@ -36,6 +36,16 @@
    - `learning_submissions` (for organizations)
    - `canon_versions` (for organizations)
    - `developer_sync_status` (for organizations)
+   - `capability_notifications` (for organizations)
+
+6. **Register yourself as a developer** (for organizations):
+   ```bash
+   curl -s -X POST "$SUPABASE_URL/rest/v1/developer_sync_status" \
+     -H "apikey: $SERVICE_ROLE_KEY" \
+     -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"developer_id": "your_name", "developer_name": "Your Full Name", "auto_sync_enabled": true}'
+   ```
 
 ---
 
