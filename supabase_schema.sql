@@ -476,6 +476,223 @@ CREATE TRIGGER update_workflow_learnings_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================
+-- LEARNING PROPAGATION (For Organizations)
+-- ============================================
+
+-- Learning submissions for review
+CREATE TABLE IF NOT EXISTS learning_submissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    learning_id UUID REFERENCES workflow_learnings(id),
+    submitted_by TEXT NOT NULL,
+    submitted_at TIMESTAMPTZ DEFAULT NOW(),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'needs_revision')),
+    reviewer TEXT,
+    reviewed_at TIMESTAMPTZ,
+    review_notes TEXT,
+    revision_count INTEGER DEFAULT 0
+);
+
+CREATE INDEX idx_submissions_status ON learning_submissions(status, submitted_at);
+
+-- Canon versions (versioned snapshots of approved learnings)
+CREATE TABLE IF NOT EXISTS canon_versions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    version_number INTEGER NOT NULL UNIQUE,
+    description TEXT,
+    learnings_snapshot JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_by TEXT
+);
+
+CREATE INDEX idx_canon_versions ON canon_versions(version_number DESC);
+
+-- Developer sync status
+CREATE TABLE IF NOT EXISTS developer_sync_status (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    developer_id TEXT NOT NULL UNIQUE,
+    developer_name TEXT,
+    current_version INTEGER NOT NULL DEFAULT 0,
+    last_sync_at TIMESTAMPTZ DEFAULT NOW(),
+    auto_sync_enabled BOOLEAN DEFAULT true
+);
+
+CREATE INDEX idx_developer_sync ON developer_sync_status(developer_id);
+
+-- Submit a learning for organization review
+CREATE OR REPLACE FUNCTION submit_learning_for_review(
+    p_learning_id UUID,
+    p_submitted_by TEXT
+)
+RETURNS UUID AS $$
+DECLARE
+    submission_id UUID;
+BEGIN
+    INSERT INTO learning_submissions (learning_id, submitted_by)
+    VALUES (p_learning_id, p_submitted_by)
+    RETURNING id INTO submission_id;
+    
+    RETURN submission_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Approve a learning submission
+CREATE OR REPLACE FUNCTION approve_learning(
+    p_submission_id UUID,
+    p_reviewer TEXT,
+    p_notes TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+    UPDATE learning_submissions
+    SET status = 'approved',
+        reviewer = p_reviewer,
+        reviewed_at = NOW(),
+        review_notes = p_notes
+    WHERE id = p_submission_id;
+    
+    RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a new canon version with all approved learnings
+CREATE OR REPLACE FUNCTION create_canon_version(
+    p_description TEXT,
+    p_created_by TEXT
+)
+RETURNS INTEGER AS $$
+DECLARE
+    new_version INTEGER;
+    learnings_json JSONB;
+BEGIN
+    SELECT COALESCE(MAX(version_number), 0) + 1 INTO new_version
+    FROM canon_versions;
+    
+    SELECT jsonb_agg(row_to_json(wl))
+    INTO learnings_json
+    FROM workflow_learnings wl
+    JOIN learning_submissions ls ON ls.learning_id = wl.id
+    WHERE ls.status = 'approved'
+    AND wl.is_active = true;
+    
+    INSERT INTO canon_versions (version_number, description, learnings_snapshot, created_by)
+    VALUES (new_version, p_description, COALESCE(learnings_json, '[]'::jsonb), p_created_by);
+    
+    RETURN new_version;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Get learnings added since a specific version
+CREATE OR REPLACE FUNCTION get_learnings_since_version(p_version INTEGER)
+RETURNS TABLE (
+    id UUID,
+    learning_type TEXT,
+    title TEXT,
+    description TEXT,
+    trigger_condition TEXT,
+    recommended_action TEXT,
+    examples JSONB,
+    effectiveness_score INTEGER
+) AS $$
+DECLARE
+    old_snapshot JSONB;
+    old_ids UUID[];
+BEGIN
+    SELECT learnings_snapshot INTO old_snapshot
+    FROM canon_versions
+    WHERE version_number = p_version;
+    
+    IF old_snapshot IS NULL OR old_snapshot = '[]'::jsonb THEN
+        old_ids := ARRAY[]::UUID[];
+    ELSE
+        SELECT array_agg((elem->>'id')::UUID)
+        INTO old_ids
+        FROM jsonb_array_elements(old_snapshot) AS elem;
+    END IF;
+    
+    RETURN QUERY
+    SELECT 
+        wl.id,
+        wl.learning_type,
+        wl.title,
+        wl.description,
+        wl.trigger_condition,
+        wl.recommended_action,
+        wl.examples,
+        wl.effectiveness_score
+    FROM workflow_learnings wl
+    JOIN learning_submissions ls ON ls.learning_id = wl.id
+    WHERE ls.status = 'approved'
+    AND wl.is_active = true
+    AND (old_ids IS NULL OR array_length(old_ids, 1) IS NULL OR wl.id != ALL(old_ids));
+END;
+$$ LANGUAGE plpgsql;
+
+-- Quality control: Auto-reject low-quality submissions
+CREATE OR REPLACE FUNCTION validate_learning_submission()
+RETURNS TRIGGER AS $$
+DECLARE
+    learning_title TEXT;
+    learning_desc TEXT;
+    learning_trigger TEXT;
+BEGIN
+    SELECT title, description, trigger_condition
+    INTO learning_title, learning_desc, learning_trigger
+    FROM workflow_learnings WHERE id = NEW.learning_id;
+    
+    IF LENGTH(learning_title) < 10 THEN
+        NEW.status := 'rejected';
+        NEW.review_notes := 'Auto-rejected: Title too short (min 10 chars)';
+        NEW.reviewed_at := NOW();
+        NEW.reviewer := 'system';
+        RETURN NEW;
+    END IF;
+    
+    IF LENGTH(learning_desc) < 50 THEN
+        NEW.status := 'rejected';
+        NEW.review_notes := 'Auto-rejected: Description too short (min 50 chars)';
+        NEW.reviewed_at := NOW();
+        NEW.reviewer := 'system';
+        RETURN NEW;
+    END IF;
+    
+    IF learning_trigger IS NULL OR LENGTH(learning_trigger) < 10 THEN
+        NEW.status := 'rejected';
+        NEW.review_notes := 'Auto-rejected: Missing or too short trigger condition';
+        NEW.reviewed_at := NOW();
+        NEW.reviewer := 'system';
+        RETURN NEW;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER check_learning_quality
+    BEFORE INSERT ON learning_submissions
+    FOR EACH ROW EXECUTE FUNCTION validate_learning_submission();
+
+-- Auto-deactivate learnings with negative effectiveness
+CREATE OR REPLACE FUNCTION check_learning_effectiveness()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.effectiveness_score < -3 THEN
+        NEW.is_active := false;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER deactivate_ineffective_learnings
+    BEFORE UPDATE ON workflow_learnings
+    FOR EACH ROW
+    WHEN (NEW.effectiveness_score < OLD.effectiveness_score)
+    EXECUTE FUNCTION check_learning_effectiveness();
+
+CREATE TRIGGER update_learning_submissions_updated_at
+    BEFORE UPDATE ON learning_submissions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================
 -- SEED DATA (Optional)
 -- ============================================
 
