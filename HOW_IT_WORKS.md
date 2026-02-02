@@ -198,6 +198,20 @@ Next time Claude.ai checks, it sees the completed work and continues from there.
 ### `adrs`
 **Purpose**: Architecture Decision Records for design decisions
 
+### `workflow_learnings`
+**Purpose**: Self-improvement through recorded patterns
+
+| Column | Purpose |
+|--------|---------|
+| `learning_type` | Category: pattern, anti_pattern, optimization, tool_usage, communication, error_recovery |
+| `title` | Short descriptive name |
+| `description` | Detailed explanation of what was learned |
+| `trigger_condition` | When to apply this learning |
+| `recommended_action` | What to do when triggered |
+| `effectiveness_score` | Upvoted when helpful, downvoted when not |
+
+**This is how Claude improves itself over time.** When Claude discovers a better way to do something—a workaround, an optimization, an error pattern—it records it to `workflow_learnings`. On every session start, Claude loads active learnings and applies them.
+
 ---
 
 ## Anti-Drift Rules
