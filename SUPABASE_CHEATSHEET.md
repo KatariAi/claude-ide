@@ -246,7 +246,7 @@ curl -X POST "$SUPABASE_URL/rest/v1/adrs" \
 | Session Key | Purpose |
 |-------------|---------|
 | `claude_ide_main` | Primary orchestrator |
-| `emergent_{id}` | Emergent Agent sessions |
+| `claude_code_{id}` | Claude Code sessions |
 | `vibe_{purpose}_{id}` | Vibe coding sessions |
 | `audit_{id}` | Audit/review sessions |
 
