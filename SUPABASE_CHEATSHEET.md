@@ -216,6 +216,64 @@ curl -X POST "$SUPABASE_URL/rest/v1/adrs" \
 
 ---
 
+## Workflow Learnings (Self-Improvement)
+
+### Get Active Learnings (call on session start)
+```bash
+curl -X GET "$SUPABASE_URL/rest/v1/workflow_learnings?is_active=eq.true&order=effectiveness_score.desc" \
+  -H "apikey: $SERVICE_ROLE_KEY" \
+  -H "Authorization: Bearer $SERVICE_ROLE_KEY"
+```
+
+### Record a Learning
+```bash
+curl -X POST "$SUPABASE_URL/rest/v1/workflow_learnings" \
+  -H "apikey: $SERVICE_ROLE_KEY" \
+  -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{
+    "learning_type": "pattern",
+    "title": "Use jq for JSON parsing in shell",
+    "description": "When parsing JSON responses from Supabase, piping to jq is more reliable than grep/sed",
+    "trigger_condition": "Parsing JSON in bash scripts",
+    "recommended_action": "Pipe curl output to jq for extraction",
+    "examples": [{"context": "Extracting ID from response", "outcome": "curl ... | jq -r .id"}],
+    "discovered_by": "claude_ide_main",
+    "discovered_in_context": "Checkpoint creation task"
+  }'
+```
+
+### Upvote a Learning (when it helps)
+```bash
+curl -X POST "$SUPABASE_URL/rest/v1/rpc/update_learning_effectiveness" \
+  -H "apikey: $SERVICE_ROLE_KEY" \
+  -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_learning_id": "LEARNING_UUID", "p_delta": 1}'
+```
+
+### Downvote a Learning (when it doesn't help)
+```bash
+curl -X POST "$SUPABASE_URL/rest/v1/rpc/update_learning_effectiveness" \
+  -H "apikey: $SERVICE_ROLE_KEY" \
+  -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_learning_id": "LEARNING_UUID", "p_delta": -1}'
+```
+
+### Learning Types
+| Type | Use For |
+|------|---------|
+| `pattern` | Successful approaches worth repeating |
+| `anti_pattern` | Things that failed or caused problems |
+| `optimization` | Faster/better ways to do something |
+| `tool_usage` | Better ways to use tools or APIs |
+| `communication` | Better coordination between instances |
+| `error_recovery` | How to recover from specific errors |
+
+---
+
 ## Useful Query Patterns
 
 ### Filter by JSON field
