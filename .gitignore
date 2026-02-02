@@ -1,0 +1,32 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Credentials (never commit these!)
+*credentials*
+*secrets*
+*api_key*
+*apikey*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Dependencies (if any tooling is added later)
+node_modules/
+__pycache__/
+*.pyc
+venv/
+.venv/
