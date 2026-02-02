@@ -3,6 +3,16 @@
 
 ---
 
+## Execution Context
+
+**Detect your environment:**
+- **Claude.ai / Claude Projects**: You have access to a computer tool with bash, file creation, and web requests. Use `curl` commands to interact with Supabase.
+- **Claude Code**: You have direct shell access. You can run bash commands, edit local files, execute git operations, and run scripts directly.
+
+If you can run `ls` or `pwd` successfully, you have shell access. Use it.
+
+---
+
 ## Prime Directive
 
 **Build and orchestrate** — a self-coordinating development system that maintains state across Claude sessions via Supabase.
@@ -72,6 +82,7 @@ BRANCH: main
 
 ## Key Functions
 
+**Via SQL (if you have direct database access):**
 ```sql
 -- Checkpoint management
 SELECT * FROM get_last_verified_checkpoint(p_session_key := 'claude_ide_main');
@@ -89,6 +100,38 @@ SELECT * FROM agent_state WHERE state_key = 'your_key';
 SELECT * FROM work_queue WHERE status = 'pending';
 SELECT claim_work('agent_role');
 SELECT complete_work(work_id, artifact_id);
+```
+
+**Via curl (Claude.ai, Claude Code, any environment with HTTP):**
+```bash
+# Set these from your credentials
+SUPABASE_URL="[YOUR_SUPABASE_URL]"
+SUPABASE_KEY="[YOUR_SERVICE_ROLE_KEY]"
+
+# Read last checkpoint
+curl -s "$SUPABASE_URL/rest/v1/context_checkpoints?session_key=eq.claude_ide_main&order=created_at.desc&limit=1" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"
+
+# Create checkpoint
+curl -s -X POST "$SUPABASE_URL/rest/v1/context_checkpoints" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{"agent_role":"orchestrator","session_key":"claude_ide_main","description":"Your description","state_snapshot":{"key":"value"},"verification_status":"verified"}'
+
+# Check pending work
+curl -s "$SUPABASE_URL/rest/v1/work_queue?status=eq.pending&order=priority.desc,created_at.asc" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"
+
+# Post work to another instance
+curl -s -X POST "$SUPABASE_URL/rest/v1/work_queue" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"source_session":"claude_ide_main","target_session":"claude_code_main","task_type":"request","payload":{"action":"implement","spec":"Your spec here"},"status":"pending"}'
 ```
 
 ---
@@ -123,7 +166,9 @@ SELECT complete_work(work_id, artifact_id);
 
 ## Session Key Convention
 
-- `claude_ide_main` — Primary orchestrator
+- `claude_ide_main` — Primary orchestrator (Claude.ai)
+- `claude_code_main` — Claude Code execution agent
+- `vibe_agent_main` — Your vibe coding agent
 - `session_{purpose}_{id}` — Purpose-specific sessions
 
 ---
@@ -140,6 +185,8 @@ SELECT complete_work(work_id, artifact_id);
 ## Cross-Instance Communication
 
 Check `work_queue` for messages from other Claude instances:
+
+**SQL:**
 ```sql
 -- Check for incoming work/messages
 SELECT * FROM work_queue 
@@ -150,6 +197,21 @@ ORDER BY created_at;
 -- Post work/message to another instance
 INSERT INTO work_queue (source_session, target_session, task_type, payload, status)
 VALUES ('claude_ide_main', 'other_session_key', 'message', '{"content":"your message"}'::jsonb, 'pending');
+```
+
+**curl:**
+```bash
+# Check for messages
+curl -s "$SUPABASE_URL/rest/v1/work_queue?target_session=eq.claude_ide_main&status=eq.pending&order=created_at.asc" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"
+
+# Send to Claude Code
+curl -s -X POST "$SUPABASE_URL/rest/v1/work_queue" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"source_session":"claude_ide_main","target_session":"claude_code_main","task_type":"request","payload":{"action":"implement","spec":"Build login form"},"status":"pending"}'
 ```
 
 ---
