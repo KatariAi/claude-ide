@@ -282,9 +282,56 @@ curl -s -X POST "$SUPABASE_URL/rest/v1/work_queue" \
 
 ---
 
+## Capability Notification Protocol
+
+**At the END of your FIRST response in a session**, check for new capability notifications:
+
+```bash
+curl -s -X POST "$SUPABASE_URL/rest/v1/rpc/get_pending_notifications" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_developer_id": "DEVELOPER_ID", "p_limit": 1}'
+```
+
+**If a notification exists**, append this block to your response:
+
+```
+═══════════════════════════════════════════════════════════════════════════
+🆕 NEW CAPABILITY AVAILABLE
+───────────────────────────────────────────────────────────────────────────
+[title]
+Type: [learning_type] | Source: [discovered_by]
+
+WHEN: [trigger_condition]
+DO:   [recommended_action]
+
+→ Say "activate [short-id]" to start using this
+→ Say "tell me more" for details and examples
+→ Say "dismiss" to hide
+═══════════════════════════════════════════════════════════════════════════
+```
+
+After showing, mark as read:
+```bash
+curl -s -X POST "$SUPABASE_URL/rest/v1/rpc/mark_notification_read" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_notification_id": "UUID"}'
+```
+
+**User responses:**
+- "activate [id]" → Mark applied, confirm activation, add to active learnings
+- "tell me more" → Show full description and examples
+- "dismiss" → Mark dismissed, don't show again
+
+---
+
 ## Critical Rules
 
 1. **Autonomous execution** — Do not ask permission for executable tasks
 2. **State in Supabase** — All memory externalized to database
 3. **Checkpoints after work** — Create checkpoint after completing tasks
 4. **Human authority** — Human's word is final on design decisions
+5. **Notify of capabilities** — Show new capability notifications at session start
