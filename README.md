@@ -71,6 +71,9 @@ Works with anything that can call a REST API: Claude.ai, Claude Projects, Claude
 ### 🧬 Self-Improvement
 When Claude discovers a better way to do something—a workaround, an optimization, an error pattern—it records it to the database. Future sessions load these learnings and apply them. Claude literally gets better over time.
 
+### 🏢 Organization-Wide Propagation
+For teams, learnings can be submitted for review and propagated to all developers. When Alice discovers an optimization, Bob and Carol benefit automatically. See [`LEARNING_PROPAGATION.md`](./LEARNING_PROPAGATION.md) for setup.
+
 ---
 
 ## 🚀 Quick Start
@@ -119,6 +122,7 @@ Session key: claude_ide_main
 | [`HOW_IT_WORKS.md`](./HOW_IT_WORKS.md) | Deep dive into the architecture |
 | [`CREDENTIALS_GUIDE.md`](./CREDENTIALS_GUIDE.md) | All the API keys and tokens you might need |
 | [`CROSS_INSTANCE_PROTOCOL.md`](./CROSS_INSTANCE_PROTOCOL.md) | How multiple AIs talk to each other |
+| [`LEARNING_PROPAGATION.md`](./LEARNING_PROPAGATION.md) | Share learnings across your organization |
 | [`SUPABASE_CHEATSHEET.md`](./SUPABASE_CHEATSHEET.md) | Copy-paste curl commands for common operations |
 | [`SETUP_CHECKLIST.md`](./SETUP_CHECKLIST.md) | Step-by-step with checkboxes |
 
