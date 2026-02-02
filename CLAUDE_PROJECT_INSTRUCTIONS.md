@@ -45,8 +45,73 @@ Execute first, report after. The only valid escalations are:
    WHERE session_key = 'claude_ide_main' 
    ORDER BY created_at DESC LIMIT 1
    ```
-3. Report: checkpoint number, current state, pending work
-4. Continue working. Do not ask "should I continue?"
+3. **Load active learnings:**
+   ```bash
+   curl -s "$SUPABASE_URL/rest/v1/workflow_learnings?is_active=eq.true&order=effectiveness_score.desc" \
+     -H "apikey: $SUPABASE_KEY" \
+     -H "Authorization: Bearer $SUPABASE_KEY"
+   ```
+4. Report: checkpoint number, current state, pending work
+5. Apply any relevant learnings to your approach
+6. Continue working. Do not ask "should I continue?"
+
+---
+
+## Self-Improvement Protocol
+
+**When you discover a better way to do something, RECORD IT.**
+
+Learning types:
+- `pattern` — A successful approach worth repeating
+- `anti_pattern` — Something that failed or caused problems
+- `optimization` — A way to do something faster/better
+- `tool_usage` — Better way to use a tool or API
+- `communication` — Better way to coordinate with other instances
+- `error_recovery` — How to recover from a specific error
+
+**Record a learning via curl:**
+```bash
+curl -s -X POST "$SUPABASE_URL/rest/v1/workflow_learnings" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{
+    "learning_type": "pattern",
+    "title": "Short descriptive title",
+    "description": "Detailed explanation of what was learned",
+    "trigger_condition": "When to apply this learning",
+    "recommended_action": "What to do when this situation arises",
+    "examples": [{"context": "...", "outcome": "..."}],
+    "discovered_by": "claude_ide_main",
+    "discovered_in_context": "What task led to this discovery"
+  }'
+```
+
+**When a learning helps, upvote it:**
+```bash
+curl -s -X POST "$SUPABASE_URL/rest/v1/rpc/update_learning_effectiveness" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_learning_id": "uuid-here", "p_delta": 1}'
+```
+
+**When a learning doesn't help, downvote it:**
+```bash
+curl -s -X POST "$SUPABASE_URL/rest/v1/rpc/update_learning_effectiveness" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_learning_id": "uuid-here", "p_delta": -1}'
+```
+
+**Triggers for recording learnings:**
+- You found a workaround for an API limitation
+- A particular prompt structure worked better
+- You discovered an error pattern and how to fix it
+- Coordination with another instance succeeded/failed
+- You found a faster way to accomplish a task
 
 ---
 
@@ -77,6 +142,7 @@ BRANCH: main
 | `agent_config` | System prompts per role |
 | `artifacts` | Output artifacts with metadata |
 | `adrs` | Architecture Decision Records |
+| `workflow_learnings` | Patterns and improvements discovered for self-improvement |
 
 ---
 
