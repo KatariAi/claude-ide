@@ -66,7 +66,7 @@ Single source of truth prevents the context degradation that plagues long-runnin
 Every checkpoint, every task, every state change is logged with timestamps. Roll back to any previous state if something goes wrong.
 
 ### 🔌 Universal Compatibility
-Works with anything that can call a REST API: Claude.ai, Claude Projects, your vibe coding agent, custom scripts, or your own AI orchestration system.
+Works with anything that can call a REST API: Claude.ai, Claude Projects, Claude Code, your vibe coding agent, custom scripts, or your own AI orchestration system.
 
 ---
 
@@ -111,6 +111,7 @@ Session key: claude_ide_main
 |------|--------------|
 | [`StartHereReadMe.md`](./StartHereReadMe.md) | Quick start checklist |
 | [`CLAUDE_PROJECT_INSTRUCTIONS.md`](./CLAUDE_PROJECT_INSTRUCTIONS.md) | Drop-in custom instructions for Claude Projects |
+| [`CLAUDE_CODE_INSTRUCTIONS.md`](./CLAUDE_CODE_INSTRUCTIONS.md) | Integration guide for Claude Code as execution agent |
 | [`supabase_schema.sql`](./supabase_schema.sql) | Complete database schema with tables and functions |
 | [`HOW_IT_WORKS.md`](./HOW_IT_WORKS.md) | Deep dive into the architecture |
 | [`CREDENTIALS_GUIDE.md`](./CREDENTIALS_GUIDE.md) | All the API keys and tokens you might need |
