@@ -4,7 +4,7 @@
 
 ---
 
-**Claude IDE** is an open-source coordination system that transforms Claude from a stateless chatbot into a persistent, collaborative development partner. Built on Supabase, it enables multiple AI instances—Claude.ai, Emergent, Cursor, or any vibe coding agent—to share memory, coordinate tasks, and pick up exactly where they left off.
+**Claude IDE** is an open-source coordination system that transforms Claude from a stateless chatbot into a persistent, collaborative development partner. Built on Supabase, it enables multiple AI instances—Claude.ai, your vibe coding agent, or any AI tool—to share memory, coordinate tasks, and pick up exactly where they left off.
 
 No more "as an AI, I don't have memory of previous conversations."
 
@@ -16,7 +16,7 @@ Now it does.
 
 Every Claude conversation starts from zero. You explain your project. Again. You re-establish context. Again. You watch Claude forget everything the moment you close the tab.
 
-Worse: if you're using multiple AI tools—Claude.ai for planning, Emergent for execution, Cursor for coding—they can't talk to each other. Each lives in its own silo, unaware of what the others have done.
+Worse: if you're using multiple AI tools—Claude.ai for planning, your vibe coding agent for execution—they can't talk to each other. Each lives in its own silo, unaware of what the others have done.
 
 This creates **drift**: the gradual accumulation of context errors, misunderstandings, and inconsistencies that compound over time. The more you work with AI, the more you fight against drift.
 
@@ -37,14 +37,14 @@ Claude IDE stores all state in a Supabase database that persists across sessions
         ↑                   ↑                   ↑
         │                   │                   │
    ┌────┴────┐        ┌────┴────┐        ┌────┴────┐
-   │ Claude  │        │ Emergent│        │ Cursor  │
-   │   .ai   │◄──────►│  Agent  │◄──────►│   AI    │
+   │ Claude  │        │  Vibe   │        │ Another │
+   │   .ai   │◄──────►│  Agent  │◄──────►│  Agent  │
    └─────────┘        └─────────┘        └─────────┘
 ```
 
 Every AI instance reads from and writes to the same database. They share:
 - **Checkpoints**: Snapshots of progress ("Completed auth flow, starting frontend")
-- **Work Queue**: Tasks and messages ("Emergent: please implement this spec")
+- **Work Queue**: Tasks and messages ("Vibe Agent: please implement this spec")
 - **State**: Configuration, decisions, context ("We're using PostgreSQL, not MongoDB")
 
 The database is the brain. The AIs are the hands.
@@ -57,7 +57,7 @@ The database is the brain. The AIs are the hands.
 Close your browser. Come back tomorrow. Say "continue" and Claude picks up exactly where you left off—no re-explanation needed.
 
 ### 🤝 Cross-Instance Coordination
-Post a task from Claude.ai. Emergent picks it up, executes it, reports back. Seamless handoffs between any AI tools that can make HTTP requests.
+Post a task from Claude.ai. Your vibe coding agent picks it up, executes it, reports back. Seamless handoffs between any AI tools that can make HTTP requests.
 
 ### 🛡️ Anti-Drift Architecture
 Single source of truth prevents the context degradation that plagues long-running AI projects. Every decision is recorded. Every state change is checkpointed.
@@ -66,7 +66,7 @@ Single source of truth prevents the context degradation that plagues long-runnin
 Every checkpoint, every task, every state change is logged with timestamps. Roll back to any previous state if something goes wrong.
 
 ### 🔌 Universal Compatibility
-Works with anything that can call a REST API: Claude.ai, Claude Projects, Emergent Agent, Cursor, Windsurf, custom scripts, or your own AI orchestration system.
+Works with anything that can call a REST API: Claude.ai, Claude Projects, your vibe coding agent, custom scripts, or your own AI orchestration system.
 
 ---
 
@@ -188,8 +188,8 @@ The real magic happens when multiple AI instances coordinate:
 
 ```
 ┌─────────────┐                              ┌─────────────┐
-│  Claude.ai  │                              │   Emergent  │
-│  (Planning) │                              │ (Execution) │
+│  Claude.ai  │                              │    Vibe     │
+│  (Planning) │                              │   Agent     │
 └──────┬──────┘                              └──────┬──────┘
        │                                            │
        │ 1. POST task to work_queue                 │
@@ -204,16 +204,16 @@ The real magic happens when multiple AI instances coordinate:
    Continue                                    Next task
 ```
 
-**Example: Delegating to Emergent**
+**Example: Delegating to Your Vibe Agent**
 
 In Claude.ai:
-> "Have Emergent implement a login form based on our auth spec"
+> "Have my vibe agent implement a login form based on our auth spec"
 
 Claude posts to `work_queue`:
 ```json
 {
   "source_session": "claude_ide_main",
-  "target_session": "emergent_main",
+  "target_session": "vibe_agent_main",
   "payload": {
     "action": "implement",
     "spec": "Login form with email/password, validation, OAuth option"
@@ -221,7 +221,7 @@ Claude posts to `work_queue`:
 }
 ```
 
-Emergent picks it up, builds it, marks complete. Next time you say "sync" in Claude.ai, it sees the finished work and continues from there.
+Your vibe agent picks it up, builds it, marks complete. Next time you say "sync" in Claude.ai, it sees the finished work and continues from there.
 
 ---
 
@@ -241,7 +241,7 @@ See [`CREDENTIALS_GUIDE.md`](./CREDENTIALS_GUIDE.md) for detailed security guida
 **Q: Does this work with the free tier of Supabase?**  
 A: Yes! The free tier is more than sufficient for personal use.
 
-**Q: Can I use this with Cursor/Windsurf/other AI coding tools?**  
+**Q: Can I use this with my vibe coding agent?**  
 A: If it can make HTTP requests to a REST API, it can participate. You'll need to add instructions telling it how to interact with the Supabase endpoints.
 
 **Q: What happens if two AI instances try to claim the same task?**  
