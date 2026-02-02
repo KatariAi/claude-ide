@@ -6,7 +6,7 @@ When you use Claude in conversations, each session starts fresh. Claude has no m
 
 1. **Lost Context**: You have to re-explain your project every time
 2. **Repeated Work**: Claude might redo work it already completed
-3. **No Coordination**: Multiple Claude instances (e.g., claude.ai and Emergent) can't talk to each other
+3. **No Coordination**: Multiple Claude instances (e.g., claude.ai and Claude Code) can't talk to each other
 4. **Drift**: Without a single source of truth, different sessions develop inconsistent understanding
 
 ## The Solution: Supabase as External Memory
@@ -32,12 +32,26 @@ This system gives Claude a persistent brain that lives outside the conversation.
          │                   │                   │
          ▼                   ▼                   ▼
 ┌─────────────┐       ┌─────────────┐      ┌─────────────┐
-│  Claude.ai  │       │  Emergent   │      │  Future     │
+│  Claude.ai  │       │ Claude Code │      │ Vibe Agent  │
 │  Session 1  │       │   Agent     │      │  Instance   │
 └─────────────┘       └─────────────┘      └─────────────┘
 ```
 
 ## How a Session Works
+
+### Instance Types
+
+Different Claude instances have different capabilities:
+
+| Instance | Environment | Shell Access | Local Files | Best For |
+|----------|-------------|--------------|-------------|----------|
+| **Claude.ai** | Browser (computer tool) | Yes (via bash tool) | No (artifacts only) | Planning, coordination, delegation |
+| **Claude Code** | Terminal/CLI | Yes (direct) | Yes | Implementation, git, testing |
+| **Vibe Agent** | Varies | Depends | Depends | Specialized tasks |
+
+**Key insight**: Claude.ai and Claude Code both have shell access, but Claude Code has direct access to your local file system and git repository. Claude.ai works through a sandboxed computer tool.
+
+All instances interact with Supabase using `curl` commands over HTTP.
 
 ### 1. Session Start
 
@@ -100,34 +114,34 @@ This checkpoint persists even after the conversation ends. The next session pick
 
 The real power emerges when multiple Claude instances coordinate through the shared database.
 
-### Scenario: Claude.ai delegates to Emergent
+### Scenario: Claude.ai delegates to Claude Code
 
 **Step 1: Claude.ai posts a task**
 ```sql
 INSERT INTO work_queue (source_session, target_session, task_type, payload, status)
 VALUES (
   'claude_ide_main',
-  'emergent_main',
+  'claude_code_main',
   'request',
   '{"action": "implement_feature", "spec": "Build login form with validation"}',
   'pending'
 );
 ```
 
-**Step 2: Emergent polls for work**
+**Step 2: Claude Code polls for work**
 ```sql
 SELECT * FROM work_queue 
-WHERE target_session = 'emergent_main' 
+WHERE target_session = 'claude_code_main' 
 AND status = 'pending';
 ```
 
-**Step 3: Emergent claims and executes**
+**Step 3: Claude Code claims and executes**
 ```sql
-SELECT * FROM claim_work('emergent_agent', 'emergent_main');
+SELECT * FROM claim_work('claude_code', 'claude_code_main');
 -- Returns the task, marks it as 'claimed'
 ```
 
-**Step 4: Emergent completes and responds**
+**Step 4: Claude Code completes and responds**
 ```sql
 UPDATE work_queue 
 SET status = 'completed', 
@@ -239,24 +253,24 @@ You: "checkpoint"
 Claude: [Creates checkpoint #48 with day's work summary]
 ```
 
-### Pattern 2: Delegate to Emergent
+### Pattern 2: Delegate to Claude Code
 
 ```
-You: "Have Emergent implement the dashboard component based on this spec: [spec]"
-Claude: [Posts to work_queue with target_session='emergent_main']
-        "Task posted to Emergent. Will check for completion on next sync."
+You: "Have Claude Code implement the dashboard component based on this spec: [spec]"
+Claude: [Posts to work_queue with target_session='claude_code_main']
+        "Task posted to Claude Code. Will check for completion on next sync."
 ```
 
-Later, in Emergent:
+Later, in Claude Code:
 ```
-Emergent: [Polls work_queue, claims task, implements, marks complete]
+Claude Code: [Polls work_queue, claims task, implements, marks complete]
 ```
 
 Back in Claude.ai:
 ```
 You: "sync"
 Claude: [Checks work_queue for completed tasks]
-        "Emergent completed dashboard implementation. Commit: abc123. 
+        "Claude Code completed dashboard implementation. Commit: abc123. 
          Integrating into main branch..."
 ```
 
