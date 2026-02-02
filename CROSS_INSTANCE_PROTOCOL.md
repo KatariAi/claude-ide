@@ -6,16 +6,36 @@ This document describes how multiple Claude instances communicate via the shared
 
 ---
 
+## Instance Types & Capabilities
+
+| Instance | Environment | Capabilities |
+|----------|-------------|--------------|
+| **Claude.ai** | Browser-based | Computer tool with bash, curl, file creation |
+| **Claude Code** | Terminal/CLI | Direct shell, local files, git, full system access |
+| **Vibe Agent** | Varies | Depends on agent; typically HTTP/curl |
+
+All instances communicate through Supabase REST API using curl or HTTP requests.
+
+---
+
 ## Architecture
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Claude IDE     │     │    Supabase     │     │   Emergent      │
-│  (claude.ai)    │◄───►│   work_queue    │◄───►│   Agent         │
+│   Claude.ai     │     │    Supabase     │     │  Claude Code    │
+│   (Planning)    │◄───►│   work_queue    │◄───►│  (Execution)    │
 │                 │     │                 │     │                 │
 │ session_key:    │     │                 │     │ session_key:    │
-│ claude_ide_main │     │                 │     │ emergent_main   │
+│ claude_ide_main │     │                 │     │ claude_code_main│
 └─────────────────┘     └─────────────────┘     └─────────────────┘
+                               ▲
+                               │
+                        ┌──────┴──────┐
+                        │ Vibe Agent  │
+                        │             │
+                        │ session_key:│
+                        │ vibe_agent_ │
+                        └─────────────┘
 ```
 
 ---
@@ -24,8 +44,29 @@ This document describes how multiple Claude instances communicate via the shared
 
 ### 1. Posting a Message
 
-Source instance creates a work_queue entry:
+Source instance creates a work_queue entry.
 
+**Via curl (all instances):**
+```bash
+curl -s -X POST "$SUPABASE_URL/rest/v1/work_queue" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_session": "claude_ide_main",
+    "target_session": "claude_code_main",
+    "task_type": "request",
+    "payload": {
+      "action": "implement",
+      "spec": "Add input validation to login form",
+      "files": ["src/components/Login.tsx"]
+    },
+    "priority": 5,
+    "status": "pending"
+  }'
+```
+
+**Via SQL (if direct database access):**
 ```sql
 INSERT INTO work_queue (
     source_session,
@@ -36,15 +77,12 @@ INSERT INTO work_queue (
     status
 ) VALUES (
     'claude_ide_main',           -- Who is sending
-    'emergent_main',             -- Who should receive
+    'claude_code_main',          -- Who should receive
     'request',                   -- Type of message
     '{                           -- Message content
-        "action": "review_code",
-        "context": {
-            "file": "src/main.py",
-            "changes": "Added error handling"
-        },
-        "reply_to": "claude_ide_main"
+        "action": "implement",
+        "spec": "Add input validation to login form",
+        "files": ["src/components/Login.tsx"]
     }'::jsonb,
     5,                           -- Priority (1-10, higher = more urgent)
     'pending'                    -- Ready to be claimed
@@ -55,9 +93,17 @@ INSERT INTO work_queue (
 
 Target instance polls for messages:
 
+**Via curl:**
+```bash
+curl -s "$SUPABASE_URL/rest/v1/work_queue?target_session=eq.claude_code_main&status=eq.pending&order=priority.desc,created_at.asc" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"
+```
+
+**Via SQL:**
 ```sql
 SELECT * FROM work_queue 
-WHERE target_session = 'emergent_main' 
+WHERE target_session = 'claude_code_main' 
 AND status = 'pending'
 ORDER BY priority DESC, created_at ASC;
 ```
@@ -67,7 +113,7 @@ ORDER BY priority DESC, created_at ASC;
 Claim the work (atomic operation prevents double-processing):
 
 ```sql
-SELECT * FROM claim_work('emergent_agent', 'emergent_main');
+SELECT * FROM claim_work('claude_code', 'claude_code_main');
 ```
 
 ### 4. Responding
@@ -90,7 +136,7 @@ INSERT INTO work_queue (
     payload,
     status
 ) VALUES (
-    'emergent_main',
+    'claude_code_main',
     'claude_ide_main',
     'response',
     '{
@@ -121,7 +167,7 @@ INSERT INTO work_queue (
 ### Pattern 1: Request-Response
 
 ```
-Claude IDE                    Supabase                     Emergent
+Claude IDE                    Supabase                     Claude Code
     │                            │                            │
     │──── POST request ─────────►│                            │
     │                            │◄─── Poll pending ──────────│
@@ -141,7 +187,7 @@ When one instance needs to hand off work to another:
 INSERT INTO work_queue (source_session, target_session, task_type, payload, status)
 VALUES (
     'claude_ide_main',
-    'emergent_main',
+    'claude_code_main',
     'handoff',
     '{
         "work_description": "Implement feature X",
@@ -161,8 +207,8 @@ INSERT INTO context_checkpoints (agent_role, session_key, description, state_sna
 VALUES (
     'orchestrator',
     'claude_ide_main',
-    'Handed off feature X implementation to emergent_main',
-    '{"status": "handed_off", "handed_to": "emergent_main", "work_id": "work_uuid"}'::jsonb,
+    'Handed off feature X implementation to claude_code_main',
+    '{"status": "handed_off", "handed_to": "claude_code_main", "work_id": "work_uuid"}'::jsonb,
     'verified'
 );
 ```
@@ -175,7 +221,7 @@ Send to multiple instances:
 -- No specific target = broadcast to all listeners
 INSERT INTO work_queue (source_session, target_session, task_type, payload, status)
 VALUES 
-    ('claude_ide_main', 'emergent_main', 'notification', '{"event": "schema_updated"}'::jsonb, 'pending'),
+    ('claude_ide_main', 'claude_code_main', 'notification', '{"event": "schema_updated"}'::jsonb, 'pending'),
     ('claude_ide_main', 'vibe_agent_1', 'notification', '{"event": "schema_updated"}'::jsonb, 'pending'),
     ('claude_ide_main', 'audit_main', 'notification', '{"event": "schema_updated"}'::jsonb, 'pending');
 ```
@@ -273,7 +319,7 @@ SELECT set_state(
             "capabilities": ["planning", "coordination"],
             "last_seen": "2024-01-01T00:00:00Z"
         },
-        "emergent_main": {
+        "claude_code_main": {
             "type": "executor",
             "capabilities": ["coding", "testing"],
             "last_seen": "2024-01-01T00:00:00Z"
