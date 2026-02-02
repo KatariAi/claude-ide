@@ -68,6 +68,9 @@ Every checkpoint, every task, every state change is logged with timestamps. Roll
 ### 🔌 Universal Compatibility
 Works with anything that can call a REST API: Claude.ai, Claude Projects, Claude Code, your vibe coding agent, custom scripts, or your own AI orchestration system.
 
+### 🧬 Self-Improvement
+When Claude discovers a better way to do something—a workaround, an optimization, an error pattern—it records it to the database. Future sessions load these learnings and apply them. Claude literally gets better over time.
+
 ---
 
 ## 🚀 Quick Start
