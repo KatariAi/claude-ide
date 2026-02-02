@@ -72,7 +72,7 @@ Works with anything that can call a REST API: Claude.ai, Claude Projects, Claude
 When Claude discovers a better way to do something—a workaround, an optimization, an error pattern—it records it to the database. Future sessions load these learnings and apply them. Claude literally gets better over time.
 
 ### 🏢 Organization-Wide Propagation
-For teams, learnings can be submitted for review and propagated to all developers. When Alice discovers an optimization, Bob and Carol benefit automatically. See [`LEARNING_PROPAGATION.md`](./LEARNING_PROPAGATION.md) for setup.
+For teams, learnings are automatically shared. When a learning is approved, **all developers are notified at the end of their next Claude response** with clear instructions on how to activate it. No manual checking required. See [`LEARNING_PROPAGATION.md`](./LEARNING_PROPAGATION.md) and [`CAPABILITY_NOTIFICATIONS.md`](./CAPABILITY_NOTIFICATIONS.md).
 
 ---
 
@@ -123,6 +123,7 @@ Session key: claude_ide_main
 | [`CREDENTIALS_GUIDE.md`](./CREDENTIALS_GUIDE.md) | All the API keys and tokens you might need |
 | [`CROSS_INSTANCE_PROTOCOL.md`](./CROSS_INSTANCE_PROTOCOL.md) | How multiple AIs talk to each other |
 | [`LEARNING_PROPAGATION.md`](./LEARNING_PROPAGATION.md) | Share learnings across your organization |
+| [`CAPABILITY_NOTIFICATIONS.md`](./CAPABILITY_NOTIFICATIONS.md) | Auto-notify developers of new capabilities |
 | [`SUPABASE_CHEATSHEET.md`](./SUPABASE_CHEATSHEET.md) | Copy-paste curl commands for common operations |
 | [`SETUP_CHECKLIST.md`](./SETUP_CHECKLIST.md) | Step-by-step with checkboxes |
 
