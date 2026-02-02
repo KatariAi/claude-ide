@@ -130,6 +130,29 @@ CREATE TABLE IF NOT EXISTS adrs (
 CREATE INDEX idx_adrs_status ON adrs(status);
 
 -- ============================================
+-- WORKFLOW LEARNINGS
+-- Patterns and improvements discovered by Claude
+-- ============================================
+CREATE TABLE IF NOT EXISTS workflow_learnings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    learning_type TEXT NOT NULL CHECK (learning_type IN ('pattern', 'anti_pattern', 'optimization', 'tool_usage', 'communication', 'error_recovery')),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    trigger_condition TEXT,  -- When to apply this learning
+    recommended_action TEXT, -- What to do when triggered
+    examples JSONB DEFAULT '[]'::jsonb,
+    effectiveness_score INTEGER DEFAULT 0, -- Track if this learning helps
+    discovered_by TEXT,      -- Which session discovered this
+    discovered_in_context TEXT, -- What task led to this discovery
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_workflow_learnings_type ON workflow_learnings(learning_type, is_active);
+CREATE INDEX idx_workflow_learnings_active ON workflow_learnings(is_active, effectiveness_score DESC);
+
+-- ============================================
 -- HELPER FUNCTIONS
 -- ============================================
 
@@ -298,6 +321,80 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Record a new workflow learning
+CREATE OR REPLACE FUNCTION record_learning(
+    p_learning_type TEXT,
+    p_title TEXT,
+    p_description TEXT,
+    p_trigger_condition TEXT DEFAULT NULL,
+    p_recommended_action TEXT DEFAULT NULL,
+    p_examples JSONB DEFAULT '[]'::jsonb,
+    p_discovered_by TEXT DEFAULT NULL,
+    p_discovered_in_context TEXT DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+    new_id UUID;
+BEGIN
+    INSERT INTO workflow_learnings (
+        learning_type, title, description, trigger_condition,
+        recommended_action, examples, discovered_by, discovered_in_context
+    ) VALUES (
+        p_learning_type, p_title, p_description, p_trigger_condition,
+        p_recommended_action, p_examples, p_discovered_by, p_discovered_in_context
+    )
+    RETURNING id INTO new_id;
+    
+    RETURN new_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Get active learnings (call on session start)
+CREATE OR REPLACE FUNCTION get_active_learnings(p_learning_type TEXT DEFAULT NULL)
+RETURNS TABLE (
+    id UUID,
+    learning_type TEXT,
+    title TEXT,
+    description TEXT,
+    trigger_condition TEXT,
+    recommended_action TEXT,
+    examples JSONB,
+    effectiveness_score INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        wl.id,
+        wl.learning_type,
+        wl.title,
+        wl.description,
+        wl.trigger_condition,
+        wl.recommended_action,
+        wl.examples,
+        wl.effectiveness_score
+    FROM workflow_learnings wl
+    WHERE wl.is_active = true
+    AND (p_learning_type IS NULL OR wl.learning_type = p_learning_type)
+    ORDER BY wl.effectiveness_score DESC, wl.created_at DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Update learning effectiveness (call when a learning helped or didn't)
+CREATE OR REPLACE FUNCTION update_learning_effectiveness(
+    p_learning_id UUID,
+    p_delta INTEGER  -- +1 if helped, -1 if didn't help
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+    UPDATE workflow_learnings
+    SET effectiveness_score = effectiveness_score + p_delta,
+        updated_at = NOW()
+    WHERE id = p_learning_id;
+    
+    RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Set state (creates new version)
 CREATE OR REPLACE FUNCTION set_state(
     p_state_key TEXT,
@@ -374,6 +471,10 @@ CREATE TRIGGER update_adrs_updated_at
     BEFORE UPDATE ON adrs
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+CREATE TRIGGER update_workflow_learnings_updated_at
+    BEFORE UPDATE ON workflow_learnings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
 -- ============================================
 -- SEED DATA (Optional)
 -- ============================================
@@ -403,3 +504,4 @@ COMMENT ON TABLE agent_state IS 'Versioned key-value store for prompts, schemas,
 COMMENT ON TABLE agent_config IS 'System prompts and capabilities per agent role';
 COMMENT ON TABLE artifacts IS 'Output artifacts with metadata and optional git references';
 COMMENT ON TABLE adrs IS 'Architecture Decision Records for design decisions';
+COMMENT ON TABLE workflow_learnings IS 'Patterns and improvements discovered by Claude for continuous self-improvement';
