@@ -33,6 +33,9 @@
    - `artifacts`
    - `adrs`
    - `workflow_learnings`
+   - `learning_submissions` (for organizations)
+   - `canon_versions` (for organizations)
+   - `developer_sync_status` (for organizations)
 
 ---
 
